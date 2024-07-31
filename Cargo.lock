@@ -125,6 +125,7 @@ checksum = "8ec610d8f49840a5b376c69663b6369e71f4b34484b9b2eb29fb918d92516cb9"
 dependencies = [
  "bare-metal",
  "bitfield",
+ "critical-section",
  "embedded-hal 0.2.7",
  "volatile-register",
 ]
@@ -318,9 +319,12 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec648daedd2143466eff4b3e8002024f9f6c1de4ab7666bb679688752624c925"
 dependencies = [
+ "cortex-m",
  "critical-section",
  "document-features",
  "embassy-executor-macros",
+ "embassy-time-driver",
+ "embassy-time-queue-driver",
 ]
 
 [[package]]
@@ -369,6 +373,7 @@ dependencies = [
  "embassy-hal-internal",
  "embassy-sync",
  "embassy-time",
+ "embassy-time-driver",
  "embassy-usb-driver",
  "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
@@ -762,10 +767,11 @@ checksum = "b4ce301924b7887e9d637144fdade93f9dfff9b60981d4ac161db09720d39aa5"
 name = "livesport-display"
 version = "0.1.0"
 dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
  "defmt",
  "defmt-rtt",
  "embassy-executor",
- "embassy-executor-macros",
  "embassy-rp",
  "embassy-time",
  "panic-probe",

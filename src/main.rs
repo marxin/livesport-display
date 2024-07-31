@@ -1,11 +1,10 @@
 #![no_std]
 #![no_main]
 
-use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio;
 use embassy_time::Timer;
-use gpio::{Level, Output, OutputOpenDrain};
+use gpio::{Level, OutputOpenDrain};
 use {defmt_rtt as _, panic_probe as _};
 
 use crate::tm1637::{DIGITS, TM1637};

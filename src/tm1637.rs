@@ -52,12 +52,12 @@ pub(crate) const DIGITS: [u8; 16] = [
 ];
 
 pub(crate) struct TM1637<'clk, 'dio> {
-    clk: OutputOpenDrain<'clk, PIN_14>,
-    dio: OutputOpenDrain<'dio, PIN_15>,
+    clk: OutputOpenDrain<'clk>,
+    dio: OutputOpenDrain<'dio>,
 }
 
 impl<'clk, 'dio> TM1637<'clk, 'dio> {
-    pub fn new(clk: OutputOpenDrain<'clk, PIN_14>, dio: OutputOpenDrain<'dio, PIN_15>) -> Self {
+    pub fn new(clk: OutputOpenDrain<'clk>, dio: OutputOpenDrain<'dio>) -> Self {
         Self { clk, dio }
     }
 

@@ -37,11 +37,7 @@ const WIFI_PASSWORD: &str = "spartapraha"; // change to your network password
 
 #[embassy_executor::task]
 async fn wifi_task(
-    runner: cyw43::Runner<
-        'static,
-        Output<'static, PIN_23>,
-        PioSpi<'static, PIN_25, PIO0, 0, DMA_CH0>,
-    >,
+    runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>,
 ) -> ! {
     runner.run().await
 }
@@ -70,6 +66,11 @@ async fn main(spawner: Spawner) {
     info!("Hello World!");
 
     let p = embassy_rp::init(Default::default());
+
+    let clock_pin = OutputOpenDrain::new(p.PIN_14, Level::Low);
+    let dio_pin = OutputOpenDrain::new(p.PIN_15, Level::Low);
+    let mut tm = TM1637::new(clock_pin, dio_pin);
+
     let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
     let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
     // To make flashing faster for development, you may want to flash the firmwares independently
@@ -80,7 +81,7 @@ async fn main(spawner: Spawner) {
     // let clm = unsafe { core::slice::from_raw_parts(0x10140000 as *const u8, 4752) };
 
     let pwr = Output::new(p.PIN_23, Level::Low);
-    let cs: Output<PIN_25> = Output::new(p.PIN_25, Level::High);
+    let cs: Output = Output::new(p.PIN_25, Level::High);
     let mut pio = Pio::new(p.PIO0, Irqs);
     let spi = PioSpi::new(
         &mut pio.common,
@@ -103,11 +104,12 @@ async fn main(spawner: Spawner) {
         .await;
 
     control.gpio_set(0, true).await;
-    /*
 
-    let clock_pin = OutputOpenDrain::new(p.PIN_14, Level::Low);
-    let dio_pin = OutputOpenDrain::new(p.PIN_15, Level::Low);
-    let mut tm = TM1637::new(clock_pin, dio_pin);
+    loop {
+        set_score(&mut tm, 7).await;
+    }
+
+    /*
 
     let config = Config::dhcpv4(Default::default());
     // Use static IP configuration instead of DHCP

@@ -103,14 +103,6 @@ async fn main(spawner: Spawner) {
         .set_power_management(cyw43::PowerManagementMode::PowerSave)
         .await;
 
-    control.gpio_set(0, true).await;
-
-    loop {
-        set_score(&mut tm, 7).await;
-    }
-
-    /*
-
     let config = Config::dhcpv4(Default::default());
     // Use static IP configuration instead of DHCP
     //let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
@@ -145,6 +137,9 @@ async fn main(spawner: Spawner) {
         }
     }
 
+    control.gpio_set(0, true).await;
+    set_score(&mut tm, 7).await;
+
     // Wait for DHCP, not necessary when using static IP
     info!("waiting for DHCP...");
     while !stack.is_config_up() {
@@ -161,6 +156,8 @@ async fn main(spawner: Spawner) {
     info!("waiting for stack to be up...");
     stack.wait_config_up().await;
     info!("Stack is up!");
+
+    /*
 
     // And now we can use it!
 

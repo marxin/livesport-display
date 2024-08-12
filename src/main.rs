@@ -37,7 +37,7 @@ bind_interrupts!(struct Irqs {
 
 const WIFI_NETWORK: &str = "marxin";
 
-static SCORE_SIGNAL: Signal<CriticalSectionRawMutex, (u64, u64)> = Signal::new();
+static SCORE_SIGNAL: Signal<CriticalSectionRawMutex, Option<(u64, u64)>> = Signal::new();
 static TIME_SIGNAL: Signal<CriticalSectionRawMutex, GameTime> = Signal::new();
 
 #[embassy_executor::task]
@@ -57,31 +57,32 @@ async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
     score_display.set_brightness(0, false).await;
 
     loop {
-        let (my_team_score, opponent_team_score) = SCORE_SIGNAL.wait().await;
+        let score = SCORE_SIGNAL.wait().await;
+        if let Some((my_team_score, opponent_team_score)) = score {
+            let mut digits = [
+                Some((my_team_score / 10) % 10),
+                Some(my_team_score % 10),
+                Some((opponent_team_score / 10) % 10),
+                Some(opponent_team_score % 10),
+            ];
+            // trim leading zero
+            if digits[0] == Some(0) {
+                digits[0] = None;
+            }
 
-        let mut digits = [
-            Some((my_team_score / 10) % 10),
-            Some(my_team_score % 10),
-            Some((opponent_team_score / 10) % 10),
-            Some(opponent_team_score % 10),
-        ];
-        // trim leading zero
-        if digits[0] == Some(0) {
-            digits[0] = None;
+            // trim trailing zero
+            if digits[2] == Some(0) {
+                digits[2] = digits[3];
+                digits[3] = None;
+            }
+
+            let mut digit_codes = [0u8; 4];
+            for i in 0..digits.len() {
+                digit_codes[i] = get_digit_code(digits[i]);
+            }
+
+            score_display.display(digit_codes, true, 3).await;
         }
-
-        // trim trailing zero
-        if digits[2] == Some(0) {
-            digits[2] = digits[3];
-            digits[3] = None;
-        }
-
-        let mut digit_codes = [0u8; 4];
-        for i in 0..digits.len() {
-            digit_codes[i] = get_digit_code(digits[i]);
-        }
-
-        score_display.display(digit_codes, true, 3).await;
     }
 }
 
@@ -313,7 +314,12 @@ async fn main(spawner: Spawner) {
         let bytes = body.as_bytes();
         match serde_json_core::de::from_slice::<GameResult>(bytes) {
             Ok((game_result, _used)) => {
-                SCORE_SIGNAL.signal((game_result.my_team_score, game_result.opponent_team_score));
+                let score = if let GameTime::WillBePlayed = game_result.game_time {
+                    None
+                } else {
+                    Some((game_result.my_team_score, game_result.opponent_team_score))
+                };
+                SCORE_SIGNAL.signal(score);
                 TIME_SIGNAL.signal(game_result.game_time);
             }
             Err(e) => {

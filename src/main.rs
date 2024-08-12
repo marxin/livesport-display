@@ -165,11 +165,26 @@ async fn main(spawner: Spawner) {
     info!("Stack is up!");
 
     // And now we can use it!
+    enum SleepState {
+        FirstIteration,
+        AfterSuccess,
+        AfterFailure,
+    }
+
+    let mut sleep_state = SleepState::FirstIteration;
 
     loop {
         let mut rx_buffer = [0; 8192];
         let mut tls_read_buffer = [0; 16640];
         let mut tls_write_buffer = [0; 16640];
+
+        let sleep_in_secs = match sleep_state {
+            SleepState::FirstIteration => 0,
+            SleepState::AfterSuccess => 5,
+            SleepState::AfterFailure => 30,
+        };
+
+        Timer::after(Duration::from_secs(sleep_in_secs)).await;
 
         let client_state = TcpClientState::<1, 1024, 1024>::new();
         let tcp_client = TcpClient::new(stack, &client_state);
@@ -189,7 +204,8 @@ async fn main(spawner: Spawner) {
             Ok(req) => req,
             Err(e) => {
                 error!("Failed to make HTTP request: {:?}", e);
-                return; // handle the error
+                sleep_state = SleepState::AfterFailure;
+                continue;
             }
         };
 
@@ -197,7 +213,8 @@ async fn main(spawner: Spawner) {
             Ok(resp) => resp,
             Err(_e) => {
                 error!("Failed to send HTTP request");
-                return; // handle the error;
+                sleep_state = SleepState::AfterFailure;
+                continue;
             }
         };
 
@@ -205,7 +222,8 @@ async fn main(spawner: Spawner) {
             Ok(b) => b,
             Err(_e) => {
                 error!("Failed to read response body");
-                return; // handle the error
+                sleep_state = SleepState::AfterFailure;
+                continue;
             }
         };
         info!("Response body: {:?}", &body);
@@ -226,10 +244,11 @@ async fn main(spawner: Spawner) {
             }
             Err(_e) => {
                 error!("Failed to parse response body");
-                return; // handle the error
+                sleep_state = SleepState::AfterFailure;
+                continue;
             }
         }
 
-        Timer::after(Duration::from_secs(5)).await;
+        sleep_state = SleepState::AfterSuccess;
     }
 }

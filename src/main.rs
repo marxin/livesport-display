@@ -279,7 +279,7 @@ async fn main(spawner: Spawner) {
         );
 
         let mut http_client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
-        let url = "https://marxin.eu/sparta-test.json";
+        let url = "https://marxin.eu/sparta.json";
         info!("connecting to {}", &url);
 
         let mut request = match http_client.request(Method::GET, url).await {

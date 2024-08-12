@@ -138,7 +138,7 @@ impl<'clk, 'dio> TM1637<'clk, 'dio> {
         self.stop().await;
     }
 
-    pub async fn display(&mut self, data: [u8; 4], show_colon: bool, brightness: u8, on: bool) {
+    pub async fn display(&mut self, data: [u8; 4], show_colon: bool, brightness: u8) {
         self.write_cmd(ADDRESS_AUTO_INCREMENT_1_MODE).await;
         self.start().await;
         let mut address = ADDRESS_COMMAND_BITS;
@@ -149,6 +149,6 @@ impl<'clk, 'dio> TM1637<'clk, 'dio> {
             self.write_data(address, data_item).await;
             address += 1;
         }
-        self.set_brightness(brightness, on).await;
+        self.set_brightness(brightness, true).await;
     }
 }

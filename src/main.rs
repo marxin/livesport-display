@@ -21,10 +21,11 @@ use rand::RngCore;
 use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 use reqwless::request::Method;
 use serde::Deserialize;
+use serde_json_core::heapless::String;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use crate::tm1637::{get_digit_code, TM1637};
+use crate::tm1637::{get_digit_code, DIGITS, TM1637};
 
 mod tm1637;
 
@@ -47,12 +48,16 @@ async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
     stack.run().await
 }
 
-async fn set_score<'a>(tm: &'a mut TM1637<'_, '_>, my_team_score: u64, opponent_team_score: u64) {
+async fn set_score<'a>(
+    score_display: &'a mut TM1637<'_, '_>,
+    time_display: &'a mut TM1637<'_, '_>,
+    game: GameResult,
+) {
     let mut digits = [
-        Some((my_team_score / 10) % 10),
-        Some(my_team_score % 10),
-        Some((opponent_team_score / 10) % 10),
-        Some(opponent_team_score % 10),
+        Some((game.my_team_score / 10) % 10),
+        Some(game.my_team_score % 10),
+        Some((game.opponent_team_score / 10) % 10),
+        Some(game.opponent_team_score % 10),
     ];
     // trim leading zero
     if digits[0] == Some(0) {
@@ -70,7 +75,35 @@ async fn set_score<'a>(tm: &'a mut TM1637<'_, '_>, my_team_score: u64, opponent_
         digit_codes[i] = get_digit_code(digits[i]);
     }
 
-    tm.display(digit_codes, true, 3, true).await;
+    score_display.display(digit_codes, true, 3).await;
+
+    if let GameTime::Playing(minute) = game.game_time {
+        let digits = [
+            DIGITS[((minute / 10) % 10) as usize],
+            DIGITS[(minute % 10) as usize],
+            DIGITS[0],
+            DIGITS[0],
+        ];
+        time_display.display(digits, true, 3).await;
+    }
+}
+
+#[derive(Debug, Deserialize)]
+enum GameTime {
+    WillBePlayed,
+    Played,
+    BreakAfter(u64),
+    Playing(u64),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct GameResult {
+    my_team: String<64>,
+    my_team_score: u64,
+    opponent_team: String<64>,
+    opponent_team_score: u64,
+    game_time: GameTime,
 }
 
 #[embassy_executor::main]
@@ -79,9 +112,14 @@ async fn main(spawner: Spawner) {
 
     let p = embassy_rp::init(Default::default());
 
-    let clock_pin = OutputOpenDrain::new(p.PIN_14, Level::Low);
-    let dio_pin = OutputOpenDrain::new(p.PIN_15, Level::Low);
-    let mut tm = TM1637::new(clock_pin, dio_pin);
+    let mut score_display = TM1637::new(
+        OutputOpenDrain::new(p.PIN_14, Level::Low),
+        OutputOpenDrain::new(p.PIN_15, Level::Low),
+    );
+    let mut time_display = TM1637::new(
+        OutputOpenDrain::new(p.PIN_12, Level::Low),
+        OutputOpenDrain::new(p.PIN_13, Level::Low),
+    );
 
     let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
     let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
@@ -197,7 +235,7 @@ async fn main(spawner: Spawner) {
         );
 
         let mut http_client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
-        let url = "https://marxin.eu/sparta.json";
+        let url = "https://marxin.eu/sparta-test.json";
         info!("connecting to {}", &url);
 
         let mut request = match http_client.request(Method::GET, url).await {
@@ -228,22 +266,13 @@ async fn main(spawner: Spawner) {
         };
         info!("Response body: {:?}", &body);
 
-        // parse the response body and update the RTC
-
-        #[derive(Deserialize)]
-        struct ApiResponse {
-            my_team_score: u64,
-            opponent_team_score: u64,
-            // other fields as needed
-        }
-
         let bytes = body.as_bytes();
-        match serde_json_core::de::from_slice::<ApiResponse>(bytes) {
-            Ok((output, _used)) => {
-                set_score(&mut tm, output.my_team_score, output.opponent_team_score).await;
+        match serde_json_core::de::from_slice::<GameResult>(bytes) {
+            Ok((game_result, _used)) => {
+                set_score(&mut score_display, &mut time_display, game_result).await;
             }
-            Err(_e) => {
-                error!("Failed to parse response body");
+            Err(e) => {
+                error!("Failed to parse response body: {}", e as u8);
                 sleep_state = SleepState::AfterFailure;
                 continue;
             }

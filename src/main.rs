@@ -116,12 +116,6 @@ async fn main(spawner: Spawner) {
         .await;
 
     let config = Config::dhcpv4(Default::default());
-    // Use static IP configuration instead of DHCP
-    //let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
-    //    address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 69, 2), 24),
-    //    dns_servers: Vec::new(),
-    //    gateway: Some(Ipv4Address::new(192, 168, 69, 1)),
-    //});
 
     // Generate random seed
     let mut rng = RoscRng;
@@ -189,10 +183,6 @@ async fn main(spawner: Spawner) {
 
         let mut http_client = HttpClient::new_with_tls(&tcp_client, &dns_client, tls_config);
         let url = "https://marxin.eu/sparta.json";
-        // for non-TLS requests, use this instead:
-        // let mut http_client = HttpClient::new(&tcp_client, &dns_client);
-        // let url = "http://worldtimeapi.org/api/timezone/Europe/Berlin";
-
         info!("connecting to {}", &url);
 
         let mut request = match http_client.request(Method::GET, url).await {

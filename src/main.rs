@@ -35,8 +35,7 @@ bind_interrupts!(struct Irqs {
     PIO0_IRQ_0 => InterruptHandler<PIO0>;
 });
 
-const WIFI_NETWORK: &str = "marxin"; // change to your network SSID
-const WIFI_PASSWORD: &str = "spartapraha"; // change to your network password
+const WIFI_NETWORK: &str = "marxin";
 
 static SCORE_SIGNAL: Signal<CriticalSectionRawMutex, (u64, u64)> = Signal::new();
 static TIME_SIGNAL: Signal<CriticalSectionRawMutex, GameTime> = Signal::new();
@@ -217,7 +216,10 @@ async fn main(spawner: Spawner) {
 
     loop {
         //match control.join_open(WIFI_NETWORK).await { // for open networks
-        match control.join_wpa2(WIFI_NETWORK, WIFI_PASSWORD).await {
+        match control
+            .join_wpa2(WIFI_NETWORK, include_str!("../wifi_password.txt").trim())
+            .await
+        {
             Ok(_) => break,
             Err(err) => {
                 info!("join failed with status={}", err.status);

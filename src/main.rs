@@ -24,7 +24,7 @@ use serde::Deserialize;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
-use crate::tm1637::{DIGITS, TM1637};
+use crate::tm1637::{get_digit_code, TM1637};
 
 mod tm1637;
 
@@ -47,18 +47,30 @@ async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
     stack.run().await
 }
 
-async fn set_score<'a>(tm: &'a mut TM1637<'_, '_>, my_team_score: u64) {
-    let digits: [u8; 4] = [
-        DIGITS[1],
-        DIGITS[2],
-        DIGITS[3],
-        DIGITS[(my_team_score % 10) as usize],
+async fn set_score<'a>(tm: &'a mut TM1637<'_, '_>, my_team_score: u64, opponent_team_score: u64) {
+    let mut digits = [
+        Some((my_team_score / 10) % 10),
+        Some(my_team_score % 10),
+        Some((opponent_team_score / 10) % 10),
+        Some(opponent_team_score % 10),
     ];
+    // trim leading zero
+    if digits[0] == Some(0) {
+        digits[0] = None;
+    }
 
-    tm.display(digits, true, 3, true).await;
-    Timer::after_millis(500).await;
-    tm.display(digits, false, 3, true).await;
-    Timer::after_millis(500).await;
+    // trim trailing zero
+    if digits[2] == Some(0) {
+        digits[2] = digits[3];
+        digits[3] = None;
+    }
+
+    let mut digit_codes = [0u8; 4];
+    for i in 0..digits.len() {
+        digit_codes[i] = get_digit_code(digits[i]);
+    }
+
+    tm.display(digit_codes, true, 3, true).await;
 }
 
 #[embassy_executor::main]
@@ -213,14 +225,14 @@ async fn main(spawner: Spawner) {
         #[derive(Deserialize)]
         struct ApiResponse {
             my_team_score: u64,
+            opponent_team_score: u64,
             // other fields as needed
         }
 
         let bytes = body.as_bytes();
         match serde_json_core::de::from_slice::<ApiResponse>(bytes) {
             Ok((output, _used)) => {
-                info!("Datetime: {:?}", output.my_team_score);
-                set_score(&mut tm, output.my_team_score).await;
+                set_score(&mut tm, output.my_team_score, output.opponent_team_score).await;
             }
             Err(_e) => {
                 error!("Failed to parse response body");

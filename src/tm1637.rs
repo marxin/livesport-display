@@ -46,6 +46,13 @@ pub(crate) const DIGITS: [u8; 16] = [
     0b01110001, // F
 ];
 
+pub(crate) fn get_digit_code(digit: Option<u64>) -> u8 {
+    match digit {
+        None => 0x0,
+        Some(digit) => DIGITS[digit as usize],
+    }
+}
+
 pub(crate) struct TM1637<'clk, 'dio> {
     clk: OutputOpenDrain<'clk>,
     dio: OutputOpenDrain<'dio>,

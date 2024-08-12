@@ -240,7 +240,6 @@ checksum = "8ec610d8f49840a5b376c69663b6369e71f4b34484b9b2eb29fb918d92516cb9"
 dependencies = [
  "bare-metal",
  "bitfield",
- "critical-section",
  "embedded-hal 0.2.7",
  "volatile-register",
 ]
@@ -580,6 +579,7 @@ checksum = "0ef3bac31ec146321248a169e9c7b5799f1e0b3829c7a9b324cb4600a7438f59"
 dependencies = [
  "cortex-m",
  "critical-section",
+ "defmt",
  "num-traits",
 ]
 
@@ -591,6 +591,7 @@ checksum = "55cf91dd36dfd623de32242af711fd294d41159f02130052fc93c5c5ba93febe"
 dependencies = [
  "as-slice 0.2.1",
  "atomic-pool",
+ "defmt",
  "document-features",
  "embassy-net-driver",
  "embassy-sync 0.5.0",
@@ -610,6 +611,9 @@ name = "embassy-net-driver"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524eb3c489760508f71360112bca70f6e53173e6fe48fc5f0efd0f5ab217751d"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embassy-net-driver-channel"
@@ -633,6 +637,7 @@ dependencies = [
  "cortex-m",
  "cortex-m-rt",
  "critical-section",
+ "defmt",
  "document-features",
  "embassy-embedded-hal",
  "embassy-futures",
@@ -692,6 +697,7 @@ checksum = "158080d48f824fad101d7b2fae2d83ac39e3f7a6fa01811034f7ab8ffc6e7309"
 dependencies = [
  "cfg-if",
  "critical-section",
+ "defmt",
  "document-features",
  "embassy-time-driver",
  "embassy-time-queue-driver",
@@ -722,6 +728,9 @@ name = "embassy-usb-driver"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fc247028eae04174b6635104a35b1ed336aabef4654f5e87a8f32327d231970"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "embedded-hal"
@@ -1819,6 +1828,7 @@ dependencies = [
  "bitflags 1.3.2",
  "byteorder",
  "cfg-if",
+ "defmt",
  "heapless 0.8.0",
  "managed",
 ]

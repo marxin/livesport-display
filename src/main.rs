@@ -14,7 +14,7 @@ use embassy_rp::bind_interrupts;
 use embassy_rp::clocks::RoscRng;
 use embassy_rp::gpio::OutputOpenDrain;
 use embassy_rp::gpio::{Level, Output};
-use embassy_rp::peripherals::{DMA_CH0, PIN_23, PIN_25, PIO0};
+use embassy_rp::peripherals::{DMA_CH0, PIO0};
 use embassy_rp::pio::{InterruptHandler, Pio};
 use embassy_time::{Duration, Timer};
 use rand::RngCore;
@@ -127,6 +127,8 @@ async fn main(spawner: Spawner) {
 
     unwrap!(spawner.spawn(net_task(stack)));
 
+    info!("connecting to WiFi...");
+
     loop {
         //match control.join_open(WIFI_NETWORK).await { // for open networks
         match control.join_wpa2(WIFI_NETWORK, WIFI_PASSWORD).await {
@@ -138,7 +140,6 @@ async fn main(spawner: Spawner) {
     }
 
     control.gpio_set(0, true).await;
-    set_score(&mut tm, 7).await;
 
     // Wait for DHCP, not necessary when using static IP
     info!("waiting for DHCP...");
@@ -156,8 +157,6 @@ async fn main(spawner: Spawner) {
     info!("waiting for stack to be up...");
     stack.wait_config_up().await;
     info!("Stack is up!");
-
-    /*
 
     // And now we can use it!
 
@@ -231,5 +230,4 @@ async fn main(spawner: Spawner) {
 
         Timer::after(Duration::from_secs(5)).await;
     }
-    */
 }

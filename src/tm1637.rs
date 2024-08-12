@@ -1,12 +1,7 @@
-use embassy_rp::{
-    gpio::OutputOpenDrain,
-    peripherals::{PIN_14, PIN_15},
-};
+use embassy_rp::gpio::OutputOpenDrain;
 use embassy_time::Timer;
 
-const MAX_FREQ_KHZ: u64 = 500;
-const USECS_IN_MSEC: u64 = 1_000;
-const DELAY_USECS: u64 = USECS_IN_MSEC / MAX_FREQ_KHZ;
+const DELAY_USECS: u64 = 100;
 
 const ADDRESS_AUTO_INCREMENT_1_MODE: u8 = 0x40;
 const ADDRESS_COMMAND_BITS: u8 = 0xc0;

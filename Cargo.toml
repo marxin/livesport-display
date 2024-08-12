@@ -21,6 +21,7 @@ serde = { version = "1.0.206", default-features = false, features = ["derive"] }
 serde-json-core = "0.6.0"
 static_cell = "2.1.0"
 portable-atomic = { version = "1.7", features = ["critical-section"] }
+embassy-sync = "0.6.0"
 
 [profile.dev]
 lto = true

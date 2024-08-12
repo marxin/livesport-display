@@ -1233,6 +1233,7 @@ dependencies = [
  "embassy-executor",
  "embassy-net",
  "embassy-rp",
+ "embassy-sync 0.6.0",
  "embassy-time",
  "panic-probe",
  "portable-atomic",

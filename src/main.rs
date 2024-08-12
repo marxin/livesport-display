@@ -16,6 +16,8 @@ use embassy_rp::gpio::OutputOpenDrain;
 use embassy_rp::gpio::{Level, Output};
 use embassy_rp::peripherals::{DMA_CH0, PIO0};
 use embassy_rp::pio::{InterruptHandler, Pio};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::signal::Signal;
 use embassy_time::{Duration, Timer};
 use rand::RngCore;
 use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
@@ -36,6 +38,9 @@ bind_interrupts!(struct Irqs {
 const WIFI_NETWORK: &str = "marxin"; // change to your network SSID
 const WIFI_PASSWORD: &str = "spartapraha"; // change to your network password
 
+static SCORE_SIGNAL: Signal<CriticalSectionRawMutex, (u64, u64)> = Signal::new();
+static TIME_SIGNAL: Signal<CriticalSectionRawMutex, GameTime> = Signal::new();
+
 #[embassy_executor::task]
 async fn wifi_task(
     runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>,
@@ -48,43 +53,77 @@ async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
     stack.run().await
 }
 
-async fn set_score<'a>(
-    score_display: &'a mut TM1637<'_, '_>,
-    time_display: &'a mut TM1637<'_, '_>,
-    game: GameResult,
-) {
-    let mut digits = [
-        Some((game.my_team_score / 10) % 10),
-        Some(game.my_team_score % 10),
-        Some((game.opponent_team_score / 10) % 10),
-        Some(game.opponent_team_score % 10),
-    ];
-    // trim leading zero
-    if digits[0] == Some(0) {
-        digits[0] = None;
-    }
+#[embassy_executor::task]
+async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
+    score_display.set_brightness(0, false).await;
 
-    // trim trailing zero
-    if digits[2] == Some(0) {
-        digits[2] = digits[3];
-        digits[3] = None;
-    }
+    loop {
+        let (my_team_score, opponent_team_score) = SCORE_SIGNAL.wait().await;
 
-    let mut digit_codes = [0u8; 4];
-    for i in 0..digits.len() {
-        digit_codes[i] = get_digit_code(digits[i]);
-    }
-
-    score_display.display(digit_codes, true, 3).await;
-
-    if let GameTime::Playing(minute) = game.game_time {
-        let digits = [
-            DIGITS[((minute / 10) % 10) as usize],
-            DIGITS[(minute % 10) as usize],
-            DIGITS[0],
-            DIGITS[0],
+        let mut digits = [
+            Some((my_team_score / 10) % 10),
+            Some(my_team_score % 10),
+            Some((opponent_team_score / 10) % 10),
+            Some(opponent_team_score % 10),
         ];
-        time_display.display(digits, true, 3).await;
+        // trim leading zero
+        if digits[0] == Some(0) {
+            digits[0] = None;
+        }
+
+        // trim trailing zero
+        if digits[2] == Some(0) {
+            digits[2] = digits[3];
+            digits[3] = None;
+        }
+
+        let mut digit_codes = [0u8; 4];
+        for i in 0..digits.len() {
+            digit_codes[i] = get_digit_code(digits[i]);
+        }
+
+        score_display.display(digit_codes, true, 3).await;
+    }
+}
+
+fn minute_to_digits(minute: u64) -> [u8; 4] {
+    [
+        DIGITS[((minute / 10) % 10) as usize],
+        DIGITS[(minute % 10) as usize],
+        DIGITS[0],
+        DIGITS[0],
+    ]
+}
+
+#[embassy_executor::task]
+async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
+    time_display.set_brightness(0, false).await;
+
+    loop {
+        let game_time = TIME_SIGNAL.wait().await;
+        match game_time {
+            GameTime::WillBePlayed | GameTime::Played => {
+                time_display.set_brightness(0, false).await;
+            }
+            GameTime::Playing(minute) => {
+                let digits = minute_to_digits(minute);
+
+                loop {
+                    time_display.display(digits, true, 3).await;
+                    Timer::after(Duration::from_secs(1)).await;
+                    time_display.display(digits, false, 3).await;
+                    Timer::after(Duration::from_secs(1)).await;
+                    // get a new value
+                    if TIME_SIGNAL.signaled() {
+                        break;
+                    }
+                }
+            }
+            GameTime::BreakAfter(minute) => {
+                let digits = minute_to_digits(minute);
+                time_display.display(digits, true, 3).await;
+            }
+        }
     }
 }
 
@@ -112,14 +151,17 @@ async fn main(spawner: Spawner) {
 
     let p = embassy_rp::init(Default::default());
 
-    let mut score_display = TM1637::new(
+    let score_display = TM1637::new(
         OutputOpenDrain::new(p.PIN_14, Level::Low),
         OutputOpenDrain::new(p.PIN_15, Level::Low),
     );
-    let mut time_display = TM1637::new(
+    unwrap!(spawner.spawn(update_score(score_display)));
+
+    let time_display = TM1637::new(
         OutputOpenDrain::new(p.PIN_12, Level::Low),
         OutputOpenDrain::new(p.PIN_13, Level::Low),
     );
+    unwrap!(spawner.spawn(update_time(time_display)));
 
     let fw = include_bytes!("../cyw43-firmware/43439A0.bin");
     let clm = include_bytes!("../cyw43-firmware/43439A0_clm.bin");
@@ -269,7 +311,8 @@ async fn main(spawner: Spawner) {
         let bytes = body.as_bytes();
         match serde_json_core::de::from_slice::<GameResult>(bytes) {
             Ok((game_result, _used)) => {
-                set_score(&mut score_display, &mut time_display, game_result).await;
+                SCORE_SIGNAL.signal((game_result.my_team_score, game_result.opponent_team_score));
+                TIME_SIGNAL.signal(game_result.game_time);
             }
             Err(e) => {
                 error!("Failed to parse response body: {}", e as u8);

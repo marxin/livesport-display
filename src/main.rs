@@ -86,7 +86,15 @@ async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
                 .display(digit_codes, true, DEFAULT_BRIGHTNESS_LEVEL)
                 .await;
         } else {
-            score_display.turn_off().await;
+            const EMPTY_DIGITS: [u8; 4] = [0u8; 4];
+
+            score_display
+                .display(EMPTY_DIGITS, true, DEFAULT_BRIGHTNESS_LEVEL)
+                .await;
+            Timer::after(Duration::from_secs(1)).await;
+            score_display
+                .display(EMPTY_DIGITS, false, DEFAULT_BRIGHTNESS_LEVEL)
+                .await;
         }
     }
 }

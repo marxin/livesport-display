@@ -102,6 +102,8 @@ fn minute_to_digits(minute: u64) -> [u8; 4] {
 
 #[embassy_executor::task]
 async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
+    const COLON_BLINK_INTERVAL: Duration = Duration::from_millis(500);
+
     time_display.turn_off().await;
 
     loop {
@@ -117,11 +119,11 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
                     time_display
                         .display(digits, true, DEFAULT_BRIGHTNESS_LEVEL)
                         .await;
-                    Timer::after(Duration::from_secs(1)).await;
+                    Timer::after(COLON_BLINK_INTERVAL).await;
                     time_display
                         .display(digits, false, DEFAULT_BRIGHTNESS_LEVEL)
                         .await;
-                    Timer::after(Duration::from_secs(1)).await;
+                    Timer::after(COLON_BLINK_INTERVAL).await;
                     // get a new value
                     if TIME_SIGNAL.signaled() {
                         break;

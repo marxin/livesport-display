@@ -36,6 +36,7 @@ bind_interrupts!(struct Irqs {
 });
 
 const WIFI_NETWORK: &str = "marxin";
+const DEFAULT_BRIGHTNESS_LEVEL: u8 = 3;
 
 static SCORE_SIGNAL: Signal<CriticalSectionRawMutex, Option<(u64, u64)>> = Signal::new();
 static TIME_SIGNAL: Signal<CriticalSectionRawMutex, GameTime> = Signal::new();
@@ -54,7 +55,7 @@ async fn net_task(stack: &'static Stack<cyw43::NetDriver<'static>>) -> ! {
 
 #[embassy_executor::task]
 async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
-    score_display.set_brightness(0, false).await;
+    score_display.turn_off().await;
 
     loop {
         let score = SCORE_SIGNAL.wait().await;
@@ -81,7 +82,11 @@ async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
                 digit_codes[i] = get_digit_code(digits[i]);
             }
 
-            score_display.display(digit_codes, true, 3).await;
+            score_display
+                .display(digit_codes, true, DEFAULT_BRIGHTNESS_LEVEL)
+                .await;
+        } else {
+            score_display.turn_off().await;
         }
     }
 }
@@ -97,21 +102,25 @@ fn minute_to_digits(minute: u64) -> [u8; 4] {
 
 #[embassy_executor::task]
 async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
-    time_display.set_brightness(0, false).await;
+    time_display.turn_off().await;
 
     loop {
         let game_time = TIME_SIGNAL.wait().await;
         match game_time {
             GameTime::WillBePlayed | GameTime::Played => {
-                time_display.set_brightness(0, false).await;
+                time_display.turn_off().await;
             }
             GameTime::Playing(minute) => {
                 let digits = minute_to_digits(minute);
 
                 loop {
-                    time_display.display(digits, true, 3).await;
+                    time_display
+                        .display(digits, true, DEFAULT_BRIGHTNESS_LEVEL)
+                        .await;
                     Timer::after(Duration::from_secs(1)).await;
-                    time_display.display(digits, false, 3).await;
+                    time_display
+                        .display(digits, false, DEFAULT_BRIGHTNESS_LEVEL)
+                        .await;
                     Timer::after(Duration::from_secs(1)).await;
                     // get a new value
                     if TIME_SIGNAL.signaled() {
@@ -121,7 +130,9 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
             }
             GameTime::BreakAfter(minute) => {
                 let digits = minute_to_digits(minute);
-                time_display.display(digits, true, 3).await;
+                time_display
+                    .display(digits, true, DEFAULT_BRIGHTNESS_LEVEL)
+                    .await;
             }
         }
     }

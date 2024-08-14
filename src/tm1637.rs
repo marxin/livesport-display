@@ -78,6 +78,10 @@ impl<'clk, 'dio> TM1637<'clk, 'dio> {
         self.stop().await;
     }
 
+    pub async fn turn_off(&mut self) {
+        self.set_brightness(0, false).await;
+    }
+
     async fn send_bit_and_delay(&mut self, bit: bool) {
         self.clk.set_low();
         self.delay().await;

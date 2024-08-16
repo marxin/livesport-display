@@ -41,6 +41,24 @@ const DEFAULT_BRIGHTNESS_LEVEL: u8 = 3;
 static SCORE_SIGNAL: Signal<CriticalSectionRawMutex, Option<(u64, u64)>> = Signal::new();
 static TIME_SIGNAL: Signal<CriticalSectionRawMutex, GameTime> = Signal::new();
 
+#[derive(Debug, Deserialize)]
+enum GameTime {
+    WillBePlayed(Option<(u64, u64)>),
+    Played,
+    BreakAfter(u64),
+    Playing(u64),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct GameResult {
+    my_team: String<64>,
+    my_team_score: u64,
+    opponent_team: String<64>,
+    opponent_team_score: u64,
+    game_time: GameTime,
+}
+
 #[embassy_executor::task]
 async fn wifi_task(
     runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>,
@@ -99,12 +117,12 @@ async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
     }
 }
 
-fn minute_to_digits(minute: u64) -> [u8; 4] {
+fn tuple_to_digits(tuple: (u64, u64)) -> [u8; 4] {
     [
-        DIGITS[((minute / 10) % 10) as usize],
-        DIGITS[(minute % 10) as usize],
-        DIGITS[0],
-        DIGITS[0],
+        DIGITS[((tuple.0 / 10) % 10) as usize],
+        DIGITS[(tuple.0 % 10) as usize],
+        DIGITS[((tuple.1 / 10) % 10) as usize],
+        DIGITS[(tuple.1 % 10) as usize],
     ]
 }
 
@@ -117,11 +135,24 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
     loop {
         let game_time = TIME_SIGNAL.wait().await;
         match game_time {
-            GameTime::WillBePlayed | GameTime::Played => {
+            GameTime::Played => {
                 time_display.turn_off().await;
             }
+            GameTime::WillBePlayed(when) => {
+                if let Some(when) = when {
+                    time_display
+                        .display(
+                            tuple_to_digits((when.0, when.1)),
+                            true,
+                            DEFAULT_BRIGHTNESS_LEVEL,
+                        )
+                        .await;
+                } else {
+                    time_display.turn_off().await;
+                }
+            }
             GameTime::Playing(minute) => {
-                let digits = minute_to_digits(minute);
+                let digits = tuple_to_digits((minute, 0));
 
                 loop {
                     time_display
@@ -139,31 +170,12 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
                 }
             }
             GameTime::BreakAfter(minute) => {
-                let digits = minute_to_digits(minute);
                 time_display
-                    .display(digits, true, DEFAULT_BRIGHTNESS_LEVEL)
+                    .display(tuple_to_digits((minute, 0)), true, DEFAULT_BRIGHTNESS_LEVEL)
                     .await;
             }
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-enum GameTime {
-    WillBePlayed,
-    Played,
-    BreakAfter(u64),
-    Playing(u64),
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct GameResult {
-    my_team: String<64>,
-    my_team_score: u64,
-    opponent_team: String<64>,
-    opponent_team_score: u64,
-    game_time: GameTime,
 }
 
 #[embassy_executor::main]
@@ -335,7 +347,7 @@ async fn main(spawner: Spawner) {
         let bytes = body.as_bytes();
         match serde_json_core::de::from_slice::<GameResult>(bytes) {
             Ok((game_result, _used)) => {
-                let score = if let GameTime::WillBePlayed = game_result.game_time {
+                let score = if let GameTime::WillBePlayed(_) = game_result.game_time {
                     None
                 } else {
                     Some((game_result.my_team_score, game_result.opponent_team_score))

@@ -141,11 +141,7 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
             GameTime::WillBePlayed(when) => {
                 if let Some(when) = when {
                     time_display
-                        .display(
-                            tuple_to_digits((when.0, when.1)),
-                            true,
-                            DEFAULT_BRIGHTNESS_LEVEL,
-                        )
+                        .display(tuple_to_digits((when.0, when.1)), true, 1)
                         .await;
                 } else {
                     time_display.turn_off().await;

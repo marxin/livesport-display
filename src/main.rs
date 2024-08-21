@@ -149,7 +149,7 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
                     // display hours >99 as e.g. 254h
                     if hours > 99 {
                         let digits = [
-                            DIGITS[(hours % 100) as usize],
+                            DIGITS[((hours / 100) % 10) as usize],
                             DIGITS[((hours / 10) % 10) as usize],
                             DIGITS[(hours % 10) as usize],
                             DIGIT_h,

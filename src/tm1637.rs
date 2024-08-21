@@ -47,7 +47,7 @@ pub(crate) const DIGITS: [u8; 16] = [
 ];
 
 #[allow(nonstandard_style)]
-pub(crate) const DIGIT_h: u8 = 0b0111_1100;
+pub(crate) const DIGIT_h: u8 = 0b0111_0100;
 
 pub(crate) fn get_digit_code(digit: Option<u64>) -> u8 {
     match digit {

@@ -25,6 +25,7 @@ use reqwless::request::Method;
 use serde::Deserialize;
 use serde_json_core::heapless::String;
 use static_cell::StaticCell;
+use tm1637::DIGIT_h;
 use {defmt_rtt as _, panic_probe as _};
 
 use crate::tm1637::{get_digit_code, DIGITS, TM1637};
@@ -118,8 +119,13 @@ async fn update_score(mut score_display: TM1637<'static, 'static>) -> ! {
 }
 
 fn tuple_to_digits(tuple: (u64, u64)) -> [u8; 4] {
+    let first_digit = ((tuple.0 / 10) % 10) as usize;
     [
-        DIGITS[((tuple.0 / 10) % 10) as usize],
+        if first_digit == 0 {
+            0x0
+        } else {
+            DIGITS[first_digit]
+        },
         DIGITS[(tuple.0 % 10) as usize],
         DIGITS[((tuple.1 / 10) % 10) as usize],
         DIGITS[(tuple.1 % 10) as usize],
@@ -139,10 +145,21 @@ async fn update_time(mut time_display: TM1637<'static, 'static>) -> ! {
                 time_display.turn_off().await;
             }
             GameTime::WillBePlayed(when) => {
-                if let Some(when) = when {
-                    time_display
-                        .display(tuple_to_digits((when.0, when.1)), true, 1)
-                        .await;
+                if let Some((hours, minutes)) = when {
+                    // display hours >99 as e.g. 254h
+                    if hours > 99 {
+                        let digits = [
+                            DIGITS[(hours % 100) as usize],
+                            DIGITS[((hours / 10) % 10) as usize],
+                            DIGITS[(hours % 10) as usize],
+                            DIGIT_h,
+                        ];
+                        time_display.display(digits, false, 1).await;
+                    } else {
+                        time_display
+                            .display(tuple_to_digits((hours, minutes)), true, 1)
+                            .await;
+                    }
                 } else {
                     time_display.turn_off().await;
                 }
